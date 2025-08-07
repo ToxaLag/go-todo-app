@@ -31,7 +31,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
 
     user_help_text = (
-        "**Доступные команды:**\n"
+        "*Доступные команды:*\n"
         "/start - Приветственное сообщение\n"
         "/help - Показать это сообщение\n"
         "/register - Начать регистрацию на турнир\n"
@@ -40,7 +40,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     admin_help_text = (
-        "\n\n**Команды для администраторов:**\n"
+        "\n\n*Команды для администраторов:*\n"
         "/broadcast <сообщение> - Отправить объявление всем участникам\n"
         "/open_registration - Открыть регистрацию\n"
         "/close_registration - Закрыть регистрацию\n"
