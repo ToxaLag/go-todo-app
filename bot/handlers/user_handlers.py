@@ -241,7 +241,7 @@ async def display_bracket(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for i in range(1, max_round + 1):
         bracket_text += f"\n--- **Раунд {i}** ---\n"
         cursor.execute(
-            "SELECT m.id, p1.nickname as p1_nick, p2.nickname as p2_nick, w.nickname as winner_nick, m.is_bye "
+            "SELECT m.id, m.winner_id, p1.nickname as p1_nick, p2.nickname as p2_nick, w.nickname as winner_nick, m.is_bye "
             "FROM matches m "
             "LEFT JOIN registrations p1 ON m.player1_id = p1.id "
             "LEFT JOIN registrations p2 ON m.player2_id = p2.id "
