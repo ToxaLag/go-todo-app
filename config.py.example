@@ -1,0 +1,13 @@
+# -- Telegram Bot Token --
+# Токен вашего телеграм-бота, полученный от @BotFather
+TELEGRAM_TOKEN = "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
+
+# -- Administrator IDs --
+# Список ID администраторов.
+# Пример: ADMIN_IDS = [12345678, 87654321]
+ADMIN_IDS = []
+
+# -- Character List --
+# Список всех доступных персонажей.
+# Пример: CHARACTERS = ["Scorpion", "Sub-Zero", "Liu Kang"]
+CHARACTERS = []
