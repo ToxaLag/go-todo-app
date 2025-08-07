@@ -275,7 +275,7 @@ async def display_bracket(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else:
                 bracket_text += f"Матч {match['id']}: {p1} vs {p2} (В процессе)\n"
 
-    await update.message.reply_text(bracket_text, parse_mode='Markdown')
+    await update.message.reply_text(bracket_text)
 
     cursor.close()
     conn.close()

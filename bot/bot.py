@@ -51,9 +51,9 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     if is_admin(user.id):
-        await update.message.reply_text(user_help_text + admin_help_text, parse_mode='Markdown')
+        await update.message.reply_text(user_help_text + admin_help_text)
     else:
-        await update.message.reply_text(user_help_text, parse_mode='Markdown')
+        await update.message.reply_text(user_help_text)
 
 from config import TELEGRAM_TOKEN
 
