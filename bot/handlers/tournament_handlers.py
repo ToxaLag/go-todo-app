@@ -270,9 +270,11 @@ async def reset_tournament(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     cursor.execute("DELETE FROM matches")
     cursor.execute("DELETE FROM registrations")
+    cursor.execute("DELETE FROM characters")
+    cursor.execute("DELETE FROM games")
     # Reset autoincrement counters
-    cursor.execute("DELETE FROM sqlite_sequence WHERE name IN ('matches', 'registrations')")
-    cursor.execute("UPDATE tournament_status SET registration_open = 0, mode = 'nickname' WHERE id = 1")
+    cursor.execute("DELETE FROM sqlite_sequence WHERE name IN ('matches', 'registrations', 'characters', 'games')")
+    cursor.execute("UPDATE tournament_status SET registration_open = 0, mode = 'nickname', active_game_id = NULL WHERE id = 1")
 
     conn.commit()
     cursor.close()

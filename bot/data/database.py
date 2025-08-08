@@ -1,5 +1,4 @@
 import sqlite3
-import os
 
 DB_FILE = "tournament.db"
 
@@ -23,13 +22,33 @@ def initialize_database():
     )
     """)
 
-    # Table for admins
+    # Table for games
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS games (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT UNIQUE NOT NULL
+    )
+    """)
+
+    # Table for characters
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS characters (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        game_id INTEGER NOT NULL,
+        FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE,
+        UNIQUE(name, game_id)
+    )
+    """)
+
     # Table for tournament status
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS tournament_status (
         id INTEGER PRIMARY KEY,
         registration_open BOOLEAN DEFAULT 0,
-        mode TEXT DEFAULT 'nickname'
+        mode TEXT DEFAULT 'nickname',
+        active_game_id INTEGER,
+        FOREIGN KEY (active_game_id) REFERENCES games(id)
     )
     """)
     # Ensure there's always one row in tournament_status
@@ -40,10 +59,11 @@ def initialize_database():
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS registrations (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER,
+        user_id INTEGER NOT NULL,
         nickname TEXT UNIQUE NOT NULL,
-        character_name TEXT,
-        FOREIGN KEY (user_id) REFERENCES users(id)
+        character_id INTEGER,
+        FOREIGN KEY (user_id) REFERENCES users(id),
+        FOREIGN KEY (character_id) REFERENCES characters(id)
     )
     """)
 

@@ -1,6 +1,6 @@
 import asyncio
 from functools import wraps
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update
 from telegram.ext import ContextTypes
 from ..data.database import get_db_connection
 from config import ADMIN_IDS
@@ -24,9 +24,6 @@ def admin_required(func):
 async def open_registration(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Opens tournament registration."""
     conn = get_db_connection()
-    if conn is None:
-        await update.message.reply_text("Не удалось подключиться к базе данных.")
-        return
     cursor = conn.cursor()
     cursor.execute("UPDATE tournament_status SET registration_open = 1 WHERE id = 1")
     conn.commit()
@@ -38,9 +35,6 @@ async def open_registration(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def close_registration(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Closes tournament registration."""
     conn = get_db_connection()
-    if conn is None:
-        await update.message.reply_text("Не удалось подключиться к базе данных.")
-        return
     cursor = conn.cursor()
     cursor.execute("UPDATE tournament_status SET registration_open = 0 WHERE id = 1")
     conn.commit()
@@ -52,9 +46,6 @@ async def close_registration(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def set_mode_nickname(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Sets the registration mode to nickname only."""
     conn = get_db_connection()
-    if conn is None:
-        await update.message.reply_text("Не удалось подключиться к базе данных.")
-        return
     cursor = conn.cursor()
     cursor.execute("UPDATE tournament_status SET mode = 'nickname' WHERE id = 1")
     conn.commit()
@@ -66,9 +57,6 @@ async def set_mode_nickname(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def set_mode_character(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Sets the registration mode to nickname and character."""
     conn = get_db_connection()
-    if conn is None:
-        await update.message.reply_text("Не удалось подключиться к базе данных.")
-        return
     cursor = conn.cursor()
     cursor.execute("UPDATE tournament_status SET mode = 'character' WHERE id = 1")
     conn.commit()
@@ -85,9 +73,6 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     conn = get_db_connection()
-    if conn is None:
-        await update.message.reply_text("Не удалось подключиться к базе данных.")
-        return
     cursor = conn.cursor()
 
     cursor.execute("SELECT u.telegram_id FROM users u JOIN registrations r ON u.id = r.user_id")
@@ -109,6 +94,6 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             failed_count += 1
             print(f"Failed to send message to {user_id}: {e}")
-        await asyncio.sleep(0.1)  # Avoid hitting rate limits
+        await asyncio.sleep(0.1)
 
     await update.message.reply_text(f"Сообщение отправлено.\nУспешно: {sent_count}\nНе удалось: {failed_count}")

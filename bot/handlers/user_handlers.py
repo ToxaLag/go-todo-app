@@ -2,7 +2,6 @@ from telegram import Update
 from telegram.ext import ContextTypes, ConversationHandler
 
 from ..data.database import get_db_connection
-from config import CHARACTERS
 
 # States for conversation
 NICKNAME, CHARACTER = range(2)
@@ -12,9 +11,6 @@ async def register_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     user = update.effective_user
 
     conn = get_db_connection()
-    if conn is None:
-        await update.message.reply_text("Не удалось подключиться к базе данных.")
-        return ConversationHandler.END
     cursor = conn.cursor()
 
     # Check if registration is open
@@ -66,7 +62,7 @@ async def received_nickname(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
     context.user_data['nickname'] = nickname
 
-    cursor.execute("SELECT mode FROM tournament_status WHERE id = 1")
+    cursor.execute("SELECT mode, active_game_id FROM tournament_status WHERE id = 1")
     status = cursor.fetchone()
     registration_mode = status['mode']
 
@@ -80,18 +76,22 @@ async def received_nickname(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         return ConversationHandler.END
 
     # Mode is 'character'
-    if not CHARACTERS:
-        await update.message.reply_text("Список персонажей не настроен в файле config.py. Обратитесь к администратору.")
+    active_game_id = status['active_game_id']
+    if not active_game_id:
+        await update.message.reply_text("Для турнира не выбрана активная игра. Обратитесь к администратору.")
         cursor.close()
         conn.close()
         return ConversationHandler.END
 
-    master_char_list = CHARACTERS
+    # Get all character IDs for the active game
+    cursor.execute("SELECT id, name FROM characters WHERE game_id = ?", (active_game_id,))
+    all_chars = cursor.fetchall()
 
-    cursor.execute("SELECT character_name FROM registrations WHERE character_name IS NOT NULL")
-    taken_chars = [row['character_name'] for row in cursor.fetchall()]
+    # Get all taken character IDs in the current tournament
+    cursor.execute("SELECT character_id FROM registrations WHERE character_id IS NOT NULL")
+    taken_char_ids = {row['character_id'] for row in cursor.fetchall()}
 
-    available_chars = [char for char in master_char_list if char not in taken_chars]
+    available_chars = [char for char in all_chars if char['id'] not in taken_char_ids]
 
     if not available_chars:
         await update.message.reply_text("Свободных персонажей не осталось. Обратитесь к администратору.")
@@ -103,7 +103,7 @@ async def received_nickname(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
     response_text = "Теперь выберите персонажа из списка, отправив его номер:\n\n"
     for i, char in enumerate(available_chars, 1):
-        response_text += f"{i}. {char}\n"
+        response_text += f"{i}. {char['name']}\n"
 
     await update.message.reply_text(response_text)
 
@@ -119,36 +119,28 @@ async def received_character(update: Update, context: ContextTypes.DEFAULT_TYPE)
     try:
         choice_index = int(choice) - 1
         if 0 <= choice_index < len(available_chars):
-            selected_char = available_chars[choice_index]
+            selected_char_id = available_chars[choice_index]['id']
+            selected_char_name = available_chars[choice_index]['name']
 
             conn = get_db_connection()
             cursor = conn.cursor()
 
             # Double-check if character was taken in the meantime
-            cursor.execute("SELECT id FROM registrations WHERE character_name = ?", (selected_char,))
+            cursor.execute("SELECT id FROM registrations WHERE character_id = ?", (selected_char_id,))
             if cursor.fetchone():
-                await update.message.reply_text("Этот персонаж был выбран кем-то другим, пока вы думали. Пожалуйста, попробуйте снова.")
-                # Resend the list
-                cursor.execute("SELECT character_name FROM registrations WHERE character_name IS NOT NULL")
-                taken_chars = [row['character_name'] for row in cursor.fetchall()]
-                current_available = [char for char in CHARACTERS if char not in taken_chars]
-                context.user_data['available_chars'] = current_available
-                response_text = "Выберите персонажа из обновленного списка:\n\n"
-                for i, char in enumerate(current_available, 1):
-                    response_text += f"{i}. {char}\n"
-                await update.message.reply_text(response_text)
+                await update.message.reply_text("Этот персонаж был выбран кем-то другим. Пожалуйста, попробуйте снова, начав с команды /register.")
                 cursor.close()
                 conn.close()
-                return CHARACTER
+                return ConversationHandler.END
 
             user_db_id = context.user_data['user_db_id']
             nickname = context.user_data['nickname']
 
-            cursor.execute("INSERT INTO registrations (user_id, nickname, character_name) VALUES (?, ?, ?)",
-                           (user_db_id, nickname, selected_char))
+            cursor.execute("INSERT INTO registrations (user_id, nickname, character_id) VALUES (?, ?, ?)",
+                           (user_db_id, nickname, selected_char_id))
             conn.commit()
 
-            await update.message.reply_text(f"Вы успешно зарегистрированы с никнеймом '{nickname}' и персонажем '{selected_char}'.")
+            await update.message.reply_text(f"Вы успешно зарегистрированы с никнеймом '{nickname}' и персонажем '{selected_char_name}'.")
 
             cursor.close()
             conn.close()
@@ -156,7 +148,7 @@ async def received_character(update: Update, context: ContextTypes.DEFAULT_TYPE)
         else:
             await update.message.reply_text("Неверный номер. Пожалуйста, выберите номер из списка.")
             return CHARACTER
-    except ValueError:
+    except (ValueError, TypeError):
         await update.message.reply_text("Пожалуйста, отправьте число.")
         return CHARACTER
 
@@ -169,15 +161,13 @@ async def my_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Shows the user their registration status and current match."""
     user = update.effective_user
     conn = get_db_connection()
-    if conn is None:
-        await update.message.reply_text("Не удалось подключиться к базе данных.")
-        return
     cursor = conn.cursor()
 
     cursor.execute(
-        "SELECT r.nickname, r.character_name "
+        "SELECT r.nickname, c.name as character_name "
         "FROM registrations r "
         "JOIN users u ON r.user_id = u.id "
+        "LEFT JOIN characters c ON r.character_id = c.id "
         "WHERE u.telegram_id = ?",
         (user.id,)
     )
@@ -222,9 +212,6 @@ async def my_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def display_bracket(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Displays the current tournament bracket."""
     conn = get_db_connection()
-    if conn is None:
-        await update.message.reply_text("Не удалось подключиться к базе данных.")
-        return
     cursor = conn.cursor()
 
     cursor.execute("SELECT MAX(round) as max_round FROM matches")
@@ -236,10 +223,10 @@ async def display_bracket(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     max_round = max_round_row['max_round']
-    bracket_text = "🏆 **Турнирная сетка** 🏆\n"
+    bracket_text = "🏆 Турнирная сетка 🏆\n"
 
     for i in range(1, max_round + 1):
-        bracket_text += f"\n--- **Раунд {i}** ---\n"
+        bracket_text += f"\n--- Раунд {i} ---\n"
         cursor.execute(
             "SELECT m.id, m.winner_id, p1.nickname as p1_nick, p2.nickname as p2_nick, w.nickname as winner_nick, m.is_bye "
             "FROM matches m "
@@ -253,7 +240,7 @@ async def display_bracket(update: Update, context: ContextTypes.DEFAULT_TYPE):
         matches = cursor.fetchall()
 
         if not matches:
-            bracket_text += "_Матчи еще не сгенерированы._\n"
+            bracket_text += "Матчи еще не сгенерированы.\n"
             continue
 
         for match in matches:
@@ -266,12 +253,9 @@ async def display_bracket(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             if match['winner_nick']:
                 winner = match['winner_nick']
-                if winner == p1:
-                    bracket_text += f"Матч {match['id']}: **{p1}** vs {p2} -> 👑 {winner}\n"
-                else:
-                    bracket_text += f"Матч {match['id']}: {p1} vs **{p2}** -> 👑 {winner}\n"
+                bracket_text += f"Матч {match['id']}: {p1} vs {p2} -> 👑 {winner}\n"
             elif match['winner_id'] == -1: # Both DQ'd
-                 bracket_text += f"Матч {match['id']}: ~~{p1} vs {p2}~~ (Оба дисквалифицированы)\n"
+                 bracket_text += f"Матч {match['id']}: {p1} vs {p2} (Оба дисквалифицированы)\n"
             else:
                 bracket_text += f"Матч {match['id']}: {p1} vs {p2} (В процессе)\n"
 
